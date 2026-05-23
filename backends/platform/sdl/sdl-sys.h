@@ -197,6 +197,12 @@
 #pragma warning(push)
 #pragma warning(disable:4121) // alignment of a member was sensitive to packing
 #if !SDL_VERSION_ATLEAST(3, 0, 0)
+// The WebOS PDK SDL_config.h incorrectly defines SDL_VIDEO_DRIVER_X11 (it was
+// generated on a desktop Linux host). Undo that so SDL_syswm.h doesn't try to
+// pull in X11/Xlib.h, which is not present in the WebOS device sysroot.
+#ifdef WEBOS
+#undef SDL_VIDEO_DRIVER_X11
+#endif
 #include <SDL_syswm.h>
 #endif
 #pragma warning(pop)

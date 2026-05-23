@@ -85,6 +85,7 @@ backends/dialogs/win32/win32-dialogs.cpp
 backends/events/default/default-events.cpp
 backends/events/maemosdl/maemosdl-events.cpp
 backends/events/openpandora/op-events.cpp
+backends/events/webossdl/webossdl-events.cpp
 backends/fs/android/android-saf-fs.cpp
 backends/graphics/atari/atari-graphics.cpp
 backends/graphics/opengl/opengl-graphics.cpp
