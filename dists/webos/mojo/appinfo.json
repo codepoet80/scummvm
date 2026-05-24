@@ -1,6 +1,6 @@
 {
 	"id": "APP_ID",
-	"version": "APP_VERSION",
+	"version": "2.2.2026",
 	"vendor": "ScummVM Team",
 	"type": "pdk",
 	"main": "start",
