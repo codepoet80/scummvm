@@ -96,23 +96,45 @@ for finger slot 0, with no actual finger present. Because
    (cleared by the phantom BUTTONUP) so `handleMouseButtonUp` skips
    entirely.
 
-**Fix** (in `webossdl-events.cpp`):
+**Fix** (in `webossdl-events.cpp` and `webossdl-events.h`):
 
 ```
 handleMouseButtonDown:
   Save wasFingerDown before setting _fingerDown[which]=true.
-  If (which==0 && wasFingerDown && _doClick): phantom — return false.
-  This prevents phantom BUTTONDOWN from relocating _curX/_curY.
+  If (which==0 && wasFingerDown && _doClick):
+    Set _phantomSequenceActive = true, then return false.
+    This prevents phantom BUTTONDOWN from relocating _curX/_curY
+    and arms the guard for subsequent phantom MOTION events.
+
+handleMouseMotion (before _dragDiffX/Y accumulation):
+  If (ev.motion.which==0 && _phantomSequenceActive): return false.
+  This must happen BEFORE the accumulation step so phantom xrel
+  never enters _dragDiffX/Y — if it did, it could exceed the deadzone
+  and cancel _doClick (trackpad mode) or corrupt the drag total.
 
 handleMouseMotion, case 0, direct-touch branch:
   If _doClick is true: return false (not break).
-  Returning false discards the event cleanly; break returns true with
-  a stale event.type from the previous iteration.
+  Handles residual real-finger motion in direct-touch mode (phantom
+  motion was already blocked above). Returning false discards cleanly;
+  break returns true with a stale event.type from the previous iteration.
 
 handleMouseMotion, case 0, _doClick cancellation:
   Gate on _trackpadMode only. In direct-touch mode the cursor snaps
-  to absolute position; cumulative relative noise (xrel) from phantom
-  events must not cancel the pending click.
+  to absolute position; cumulative relative noise from phantom events
+  must not cancel the pending click.
+
+handleMouseButtonUp:
+  When _fingerDown[which] is false (guard fails): return false, not true.
+  The original 2.1.0 code always returned true here; this was harmless
+  because the guard only failed after gesture handlers manually cleared
+  _fingerDown. The phantom fix introduced a new common case: phantom
+  BUTTONUP clears _fingerDown[0], so the real BUTTONUP always hits the
+  guard. Without this fix, the stale event.type = EVENT_LBUTTONDOWN
+  (left by the phantom BUTTONUP handler) was re-dispatched as a spurious
+  unmatched press on every tap, accumulating N extra presses across N
+  taps until the UI treated buttons as permanently held.
+  After clearing _fingerDown[which], if which==0: also clear
+  _phantomSequenceActive to end the phantom sequence guard.
 ```
 
 The original 2.1.0 code had the same deadzone logic but worked because
@@ -120,9 +142,9 @@ the hardware was newer and generated less noise. The phantom-event
 problem is a hardware aging issue; devices used since 2019 require
 this hardening.
 
-**This was NOT present in 2.1.0 code and is the only logic change
-from the original port.** Everything else is identical to the 2.1.0
-WebOS backend.
+**These changes are NOT present in 2.1.0 code and are the only logic
+differences from the original port.** Everything else is identical to
+the 2.1.0 WebOS backend.
 
 ---
 
