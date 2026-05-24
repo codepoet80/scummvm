@@ -174,8 +174,14 @@ bool WebOSSdlEventSource::handleMouseButtonDown(SDL_Event &ev,
 		if (!_trackpadMode) {
 			_curX = MIN(_screenX, MAX(0, 0 + ev.motion.x));
 			_curY = MIN(_screenY, MAX(0, 0 + ev.motion.y));
-			// If we're already clicking, hold it until after the move.
-			if (event.type == Common::EVENT_LBUTTONDOWN) {
+			// If a drag was just triggered by a double-tap in this very call
+			// (i.e. _dragging was just set above), push the button-down at the
+			// old position before snapping the cursor to the new tap position.
+			// DO NOT use event.type here — it holds a stale value from the
+			// previous call (the UP handler returns event.type=LBUTTONDOWN),
+			// which would cause an extra orphaned LBUTTONDOWN to be pushed on
+			// every subsequent tap, permanently confusing the GUI button state.
+			if (_dragging) {
 				processMouseEvent(event, _curX, _curY);
 				g_system->getEventManager()->pushEvent(event);
 			}

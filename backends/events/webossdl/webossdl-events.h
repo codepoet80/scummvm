@@ -55,6 +55,11 @@ public:
 			_fingerDown[i] = false;
 			_screenDownTime[i] = _dragDiffX[i] = _dragDiffY[i] = 0;
 		}
+		// The WebOS PDK registers the device accelerometer as joystick 0.
+		// Leaving it open causes the keymapper to convert accelerometer axis
+		// events into continuous mouse movement, making the cursor drift to the
+		// top-left corner under gravity.  Close it immediately.
+		closeJoystick();
 	};
 protected:
 	// Inidicates if gesture area is pressed down or not.
