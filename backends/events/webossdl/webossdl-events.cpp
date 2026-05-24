@@ -147,7 +147,10 @@ bool WebOSSdlEventSource::handleMouseButtonDown(SDL_Event &ev,
 
 	if (ev.button.which == 0 && wasFingerDown && _doClick) {
 		// Phantom spurious button-down while a real tap is in progress.
-		// Don't reset state or move the cursor.
+		// Don't reset state or move the cursor.  Arm the sequence guard so
+		// that subsequent phantom MOTION events are also discarded before
+		// they can corrupt _dragDiffX/Y or drift the cursor.
+		_phantomSequenceActive = true;
 		return false;
 	}
 
@@ -200,47 +203,57 @@ bool WebOSSdlEventSource::handleMouseButtonDown(SDL_Event &ev,
  */
 bool WebOSSdlEventSource::handleMouseButtonUp(SDL_Event &ev,
 		Common::Event &event) {
-	// Only react if the finger hasn't been virtually lifted already
-	if (_fingerDown[ev.button.which]) {
-		// No matter what, if it's the first finger that's lifted when
-		// we're dragging, just lift the mouse button.
-		if (ev.button.which == 0 && _dragging) {
+	// Only react if the finger hasn't been virtually lifted already.
+	// Return false (not true) so that SdlEventSource discards this SDL event
+	// without dispatching a stale event to the game.  Previously returning
+	// true here with an unchanged `event` caused the phantom-BUTTONUP handler
+	// to leave EVENT_LBUTTONDOWN as a stale type, which was then re-emitted
+	// by the real BUTTONUP, producing an unmatched press that accumulated
+	// across multiple taps and corrupted the button-state machine.
+	if (!_fingerDown[ev.button.which])
+		return false;
+
+	// No matter what, if it's the first finger that's lifted when
+	// we're dragging, just lift the mouse button.
+	if (ev.button.which == 0 && _dragging) {
+		event.type = Common::EVENT_LBUTTONUP;
+		processMouseEvent(event, _curX, _curY);
+		_dragging = false;
+	} else {
+		// If it was the first finger and the click hasn't been
+		// canceled, it's a click.
+		if (ev.button.which == 0 && _doClick &&
+				!_fingerDown[1] && !_fingerDown[2]) {
 			event.type = Common::EVENT_LBUTTONUP;
 			processMouseEvent(event, _curX, _curY);
-			_dragging = false;
-		} else {
-			// If it was the first finger and the click hasn't been
-			// canceled, it's a click.
-			if (ev.button.which == 0 && _doClick &&
-					!_fingerDown[1] && !_fingerDown[2]) {
-				event.type = Common::EVENT_LBUTTONUP;
-				processMouseEvent(event, _curX, _curY);
-				g_system->getEventManager()->pushEvent(event);
-				event.type = Common::EVENT_LBUTTONDOWN;
-				if (_queuedDragTime > 0)
-					_queuedDragTime = 0;
-			} else if (ev.button.which == 1 &&
-					_fingerDown[0] && _fingerDown[1] && !_fingerDown[2]) {
-				// If the first finger's down and the second taps, it's a
-				// right mouse click.
-				event.type = Common::EVENT_RBUTTONDOWN;
-				processMouseEvent(event, _curX, _curY);
-				_queuedRUpTime = g_system->getMillis() + QUEUED_RUP_DELAY;
-			} else if (ev.button.which == 2 &&
-					_fingerDown[0] && _fingerDown[1]) {
-				// If two fingers are down and a third taps, it's a middle
-				// click -- but lift the second finger so it doesn't register
-				// as a right click.
-				event.type = Common::EVENT_MBUTTONUP;
-				processMouseEvent(event, _curX, _curY);
-				g_system->getEventManager()->pushEvent(event);
-				event.type = Common::EVENT_MBUTTONDOWN;
-				_fingerDown[1] = false;
-			}
+			g_system->getEventManager()->pushEvent(event);
+			event.type = Common::EVENT_LBUTTONDOWN;
+			if (_queuedDragTime > 0)
+				_queuedDragTime = 0;
+		} else if (ev.button.which == 1 &&
+				_fingerDown[0] && _fingerDown[1] && !_fingerDown[2]) {
+			// If the first finger's down and the second taps, it's a
+			// right mouse click.
+			event.type = Common::EVENT_RBUTTONDOWN;
+			processMouseEvent(event, _curX, _curY);
+			_queuedRUpTime = g_system->getMillis() + QUEUED_RUP_DELAY;
+		} else if (ev.button.which == 2 &&
+				_fingerDown[0] && _fingerDown[1]) {
+			// If two fingers are down and a third taps, it's a middle
+			// click -- but lift the second finger so it doesn't register
+			// as a right click.
+			event.type = Common::EVENT_MBUTTONUP;
+			processMouseEvent(event, _curX, _curY);
+			g_system->getEventManager()->pushEvent(event);
+			event.type = Common::EVENT_MBUTTONDOWN;
+			_fingerDown[1] = false;
 		}
-		// Officially lift the finger that was raised.
-		_fingerDown[ev.button.which] = false;
 	}
+	// Officially lift the finger that was raised.
+	_fingerDown[ev.button.which] = false;
+	// Phantom sequence (if any) is over once finger 0 is released.
+	if (ev.button.which == 0)
+		_phantomSequenceActive = false;
 	return true;
 }
 
@@ -254,6 +267,13 @@ bool WebOSSdlEventSource::handleMouseButtonUp(SDL_Event &ev,
 bool WebOSSdlEventSource::handleMouseMotion(SDL_Event &ev,
 		Common::Event &event) {
 	if (_fingerDown[ev.motion.which]) {
+		// While a phantom sequence is active, discard all finger-0 motion
+		// events before they accumulate into _dragDiffX/Y.  This prevents
+		// phantom xrel from (a) exceeding the deadzone and cancelling
+		// _doClick, and (b) moving the cursor in trackpad mode.
+		if (ev.motion.which == 0 && _phantomSequenceActive)
+			return false;
+
 		_dragDiffX[ev.motion.which] += ev.motion.xrel;
 		_dragDiffY[ev.motion.which] += ev.motion.yrel;
 

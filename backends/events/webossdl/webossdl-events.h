@@ -47,6 +47,7 @@ public:
 			_screenX(0), _screenY(0),
 			_trackpadMode(false), _autoDragMode(true),
 			_doClick(true),
+			_phantomSequenceActive(false),
 			_queuedDragTime(0), _queuedEscapeUpTime(0), _queuedSpaceUpTime(0),
 			_queuedRUpTime(0),
 			_firstPoll(true) {
@@ -91,6 +92,13 @@ protected:
 
 	// Indicates if a click should be executed when the first finger is lifted
 	bool _doClick;
+
+	// Set when a phantom finger-0 BUTTONDOWN is detected and cleared when
+	// finger 0 is officially lifted.  While set, all finger-0 MOTION events
+	// are discarded before they can accumulate into _dragDiffX/Y or move the
+	// cursor, preventing phantom noise from cancelling _doClick or drifting
+	// the cursor in trackpad mode.
+	bool _phantomSequenceActive;
 
 	// Indicates whether the event poll has been run before
 	bool _firstPoll;
