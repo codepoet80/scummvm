@@ -3632,6 +3632,9 @@ if test -n "$_host"; then
 			append_var CXXFLAGS "-mfloat-abi=softfp"
 			append_var CXXFLAGS "-mfpu=neon"
 			append_var CXXFLAGS "-ffast-math"
+			# glibc 2.5 on WebOS does not support STB_GNU_UNIQUE symbols
+			# (requires glibc 2.11+). Force regular weak symbols instead.
+			append_var CXXFLAGS "-fno-gnu-unique"
 			append_var LDFLAGS "-Wl,-rpath-link,$WEBOS_PDK/device/lib"
 			append_var LDFLAGS "-L$WEBOS_PDK/device/lib"
 			append_var LDFLAGS "-L$WEBOS_PDK/device/usr/lib"
@@ -4273,6 +4276,22 @@ POST_OBJS_FLAGS		:= -Wl,--export-all-symbols -Wl,--no-whole-archive -Wl,--out-im
 _mak_plugins='
 LDFLAGS				+= -Wl,-T$(srcdir)/backends/plugins/psp/main_prog.ld
 PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/psp/plugin.ld -lstdc++ -lc
+'
+		;;
+	webos)
+		# WebOS plugins are ARM shared libraries, same model as Linux.
+		# -static-libgcc is required because the device libgcc.so lacks the
+		# Thumb1 switch-table helpers (__gnu_thumb1_case_*) that GCC 4.9
+		# generates; we embed them in each plugin instead.
+		_plugin_prefix="lib"
+		_plugin_suffix=".so"
+		append_var CXXFLAGS "-fPIC"
+		append_var LIBS "-ldl"
+_mak_plugins='
+PLUGIN_EXTRA_DEPS =
+PLUGIN_LDFLAGS  += -shared -static-libgcc
+PRE_OBJS_FLAGS  := -Wl,-export-dynamic -Wl,-whole-archive
+POST_OBJS_FLAGS := -Wl,-no-whole-archive
 '
 		;;
 	*)
