@@ -1558,6 +1558,15 @@ raspberrypi)
 	# It may change in the future.
 	_host_alias=arm-linux-gnueabihf
 	;;
+webos)
+	_host_os=webos
+	_host_cpu=arm
+	_host_alias=arm-linux-gnueabi
+	test "x$prefix" = xNONE && prefix=/media/cryptofs/apps/usr/palm/applications/org.scummvm.scummvm
+	datarootdir='${prefix}/data'
+	datadir='${datarootdir}'
+	docdir='${prefix}/doc'
+	;;
 caanoo)
 	_host_os=gph-linux
 	_host_cpu=arm
@@ -1867,6 +1876,16 @@ riscos)
 	fi
 	echo Over here!
 	;;
+webos)
+	if test -z "$WEBOS_SDK"; then
+		echo "Please set WEBOS_SDK in your environment. export WEBOS_SDK=<path to webOS SDK>"
+		exit 1
+	fi
+	if test -z "$WEBOS_PDK"; then
+		echo "Please set WEBOS_PDK in your environment. export WEBOS_PDK=<path to webOS PDK>"
+		exit 1
+	fi
+	;;
 *)
 	;;
 esac
@@ -2155,6 +2174,12 @@ if test "$have_gcc" = yes ; then
 		;;
 	amigaos* | dreamcast | ds | mingw* | mint* | morphos | n64 | ps3 | psp2)
 		std_variant=gnu++
+		;;
+	webos)
+		# WebOS PDK SDL1 headers use GNU extensions; -std=gnu++11 avoids
+		# __STRICT_ANSI__ suppressing needed declarations.
+		std_variant=gnu++
+		pedantic=no
 		;;
 	openbsd*)
 		pedantic=no
@@ -3131,6 +3156,36 @@ EOF
 		# Needs -lbind -lsocket for the timidity MIDI driver
 		append_var LIBS "-lnsl -lsocket"
 		;;
+	webos)
+		_optimization_level=-O2
+		append_var CXXFLAGS "--sysroot=$WEBOS_PDK/arm-gcc/sysroot"
+		append_var CXXFLAGS "-I$WEBOS_PDK/include"
+		append_var CXXFLAGS "-I$WEBOS_PDK/include/SDL"
+		append_var CXXFLAGS "-I$WEBOS_PDK/arm-gcc/sysroot/usr/include"
+		append_var CXXFLAGS "-I$WEBOS_SDK/include"
+		append_var CXXFLAGS "-I$WEBOS_PDK/include/freetype2"
+		append_var CXXFLAGS "-I$WEBOS_PDK/device/usr/include"
+		append_var CXXFLAGS "-march=armv7-a -mfloat-abi=softfp -mfpu=neon -ffast-math"
+		append_var CXXFLAGS "-fno-gnu-unique"
+		append_var LDFLAGS "-Wl,-rpath-link,$WEBOS_PDK/device/lib"
+		append_var LDFLAGS "-L$WEBOS_PDK/device/lib -L$WEBOS_PDK/device/usr/lib"
+		append_var LDFLAGS "--sysroot=$WEBOS_PDK/arm-gcc/sysroot"
+		append_var LIBS "-lSDL_net -lSDL -lpthread -lpdl -ldl -lm"
+		append_var DEFINES "-DSDL_BACKEND"
+		add_line_to_config_mk "SDL_BACKEND = 1"
+		add_line_to_config_mk "WEBOS_SDK = $WEBOS_SDK"
+		add_line_to_config_mk "SDL_NET_MAJOR = 1"
+		add_line_to_config_mk "WITHOUT_SDL = 1"
+		add_line_to_config_mk "USE_SDL_NET = 1"
+		_backend="webos"
+		_port_mk="backends/platform/webos/webos.mk"
+		_vkeybd=yes
+		_sdl=no
+		_sdlnet=no
+		if test "$_dynamic_modules" = yes; then
+			_plugins_default=dynamic
+		fi
+		;;
 	switch)
 		_pkgconfig="$DEVKITPRO/portlibs/switch/bin/aarch64-none-elf-pkg-config"
 		_libcurlpath="$DEVKITPRO/portlibs/switch/bin"
@@ -3805,6 +3860,12 @@ case $_backend in
 			;;
 		esac
 		;;
+	webos)
+		append_var DEFINES "-DWEBOS"
+		append_var DEFINES "-DARM_TARGET"
+		append_var MODULES "backends/platform/sdl"
+		_sdl=no
+		;;
 	*)
 		echo "support for $_backend backend not implemented in configure script yet"
 		exit 1
@@ -3945,7 +4006,7 @@ fi
 # Enable 16bit support only for backends which support it
 #
 case $_backend in
-	3ds | android | dingux | dc | ds | gph | iphone | ios7 | maemo | null | opendingux | openpandora | psp | psp2 | samsungtv | sdl | switch | wii)
+	3ds | android | dingux | dc | ds | gph | iphone | ios7 | maemo | null | opendingux | openpandora | psp | psp2 | samsungtv | sdl | switch | webos | wii)
 		if test "$_16bit" = auto ; then
 			_16bit=yes
 		else
@@ -4021,7 +4082,7 @@ case $_host_os in
 	amigaos* | cygwin* | dreamcast | ds | gamecube | mingw* | morphos | n64 | ps3 | psp2 | psp | riscos | wii)
 		_posix=no
 		;;
-	3ds | android | beos* | bsd* | darwin* | freebsd* | gnu* | gph-linux | haiku* | hpux* | iphone | ios7 | irix*| k*bsd*-gnu* | linux* | maemo | mint* | netbsd* | openbsd* | serenity* | solaris* | sunos* | switch | uclinux*)
+	3ds | android | beos* | bsd* | darwin* | freebsd* | gnu* | gph-linux | haiku* | hpux* | iphone | ios7 | irix*| k*bsd*-gnu* | linux* | maemo | mint* | netbsd* | openbsd* | serenity* | solaris* | sunos* | switch | uclinux* | webos)
 		_posix=yes
 		;;
 	os2-emx*)
@@ -4278,6 +4339,18 @@ PLUGIN_LDFLAGS		+= -Wl,-T$(srcdir)/backends/plugins/psp/plugin.ld -Wl,-zmax-page
 _mak_plugins='
 PLUGIN_EXTRA_DEPS	+= backends/plugins/riscos/plugin.o
 PLUGIN_LDFLAGS		+= -static -Wl,-T$(srcdir)/backends/plugins/riscos/plugin.ld backends/plugins/riscos/plugin.o -Wl,--wrap=__rt_stkovf_split_small -Wl,--wrap=__rt_stkovf_split_big
+'
+		;;
+	webos)
+		_plugin_prefix="lib"
+		_plugin_suffix=".so"
+		append_var CXXFLAGS "-fPIC"
+		append_var LIBS "-ldl"
+_mak_plugins='
+PLUGIN_EXTRA_DEPS =
+PLUGIN_LDFLAGS  += -shared -static-libgcc
+PRE_OBJS_FLAGS  := -Wl,-export-dynamic -Wl,-whole-archive
+POST_OBJS_FLAGS := -Wl,-no-whole-archive
 '
 		;;
 	*)
@@ -6037,6 +6110,9 @@ case $_host in
 		;;
 	arm-*riscos)
 		append_var DEFINES "-DPLUGIN_DIRECTORY=\\\"\${datarootdir}/plugins\\\""
+		;;
+	webos)
+		append_var DEFINES "-DPLUGIN_DIRECTORY=\\\"$libdir\\\""
 		;;
 	*)
 		append_var DEFINES "-DPLUGIN_DIRECTORY=\\\"$libdir/scummvm\\\""

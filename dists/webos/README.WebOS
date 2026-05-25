@@ -1,0 +1,167 @@
+README for the WebOS port of ScummVM
+------------------------------------
+
+SUPPORTED DEVICES
+
+  Tested on Palm Pre (WebOS 1.4.5). Should work on Palm Pre 2, Palm Pixi,
+  and HP TouchPad running WebOS 3.x, though only the Pre has been verified.
+
+INSTALLATION
+
+  Install the .ipk through Preware or the WebOS Quick Install tool.
+
+  When starting ScummVM the first time it creates the following directory
+  structure on the USB storage:
+
+    ScummVM/
+      Extras/
+      Games/
+      Plugins/
+      Saves/
+      Screenshots/
+      Themes/
+
+  To install games, switch your device to USB drive mode and copy game
+  folders into ScummVM/Games. Then start ScummVM, tap "Add Game", and
+  select the folder.
+
+  Plugins (.so files) are installed automatically under
+  /media/cryptofs/apps/usr/palm/applications/org.scummvm.scummvm/lib/
+
+CONTROLS
+
+  Default mode: Direct Touch
+  -------------------------
+  The touchscreen operates in direct-touch mode by default. The cursor
+  is invisible; tapping moves the cursor to the exact touch position
+  and registers a click there.
+
+    Single tap              Left click at tap position
+    Hold 0.5s + release     Left click (auto-drag mode: hold starts drag)
+    Two-finger tap          Right click
+    Three-finger tap        Middle click
+
+  Two-finger swipe gestures (both fingers moving same direction):
+
+    Swipe left              Escape key
+    Swipe right             Toggle trackpad mode on/off
+    Swipe up                Show on-screen keyboard (WebOS 2/3 only)
+    Swipe down              Open ScummVM main menu
+
+  Three-finger swipe gestures:
+
+    Swipe right             Toggle auto-drag mode on/off
+    Swipe down              Spacebar (pause/unpause)
+
+  Trackpad mode (toggle with two-finger swipe right)
+  --------------------------------------------------
+  The visible cursor moves relative to finger motion, like a laptop
+  trackpad. Use this for games that need precise cursor positioning.
+
+    Drag one finger         Move cursor
+    Tap (< deadzone drift)  Left click
+    Hold 0.5s               Start drag (auto-drag mode)
+    Two-finger tap          Right click
+    All swipe gestures      Same as direct-touch mode
+
+  Keyboard modifiers:
+
+    Shift, Ctrl             Standard modifier keys on the physical keyboard
+    Hold gesture area       Alt (orange key is consumed by WebOS)
+    Gesture area back       Escape
+    Gesture area forward    (passed through as keycode 229)
+
+AUTO-DRAG MODE
+
+  Auto-drag is on by default. When you hold a tap for more than 0.5
+  seconds without moving, ScummVM holds the left mouse button down so
+  you can drag objects. Lift your finger to release.
+
+  Toggle auto-drag with a three-finger swipe right. A status message
+  confirms the new state.
+
+AUDIO
+
+  This build links against the PDK-provided SDL audio. The following
+  audio formats are supported:
+
+    MIDI          Yes (built-in software synthesizer)
+    PCM/WAV       Yes
+    OGG Vorbis    No  (libtremor not built)
+    MP3           No  (libmad not built)
+    FLAC          No  (libFLAC not built)
+
+  Games that use OGG or MP3 music will run silently for those tracks.
+  Many such games still display subtitles and are fully playable.
+
+BUILDING FROM SOURCE
+
+  Requirements:
+    - WebOS PDK installed at /opt/PalmPDK
+    - WebOS SDK installed at /opt/PalmSDK/0.2
+    - Linaro GCC 4.9.4 ARM cross-compiler
+      (prefix arm-linux-gnueabi-, targeting ARMv6 softfp)
+    - The host must have ar, ranlib, nm in the Linaro toolchain bin dir
+
+  The Linaro toolchain is required (not a newer GCC) because the WebOS
+  device ships glibc 2.5 and only supports symbols up to GLIBC_2.4.
+  GCC 5+ generates GLIBC_2.17+ symbols (clock_gettime, etc.) that will
+  cause "symbol not found" crashes at launch. GCC 4.9.4 stays within
+  GLIBC_2.4 for all code paths ScummVM uses.
+
+  Configure (run from a separate build directory):
+
+    export WEBOS_PDK=/opt/PalmPDK
+    export WEBOS_SDK=/opt/PalmSDK/0.2
+    export PATH=<linaro-bin>:$PATH
+    /path/to/scummvm/configure \
+      --host=webos \
+      --enable-plugins \
+      --default-dynamic \
+      --enable-release
+
+  Then edit config.mk to replace short tool names (arm-linux-gnueabi-g++
+  etc.) with full Linaro paths if they are not first in PATH.
+
+  Build and package:
+
+    make -j$(nproc)
+    make package
+
+  The .ipk is created in portdist/.
+
+KNOWN ISSUES AND TECHNICAL NOTES
+
+  Phantom touch events
+  --------------------
+  Aging webOS hardware (particularly Palm Pre units) generates spurious
+  SDL_MOUSEBUTTONDOWN / SDL_MOUSEMOTION / SDL_MOUSEBUTTONUP event cycles
+  for touch slot 0 with no finger on the screen. This manifests as:
+
+    - In trackpad mode: the cursor drifts left then slowly upward
+    - In direct-touch mode: button presses appear to do nothing
+
+  The fix (in backends/events/webossdl/webossdl-events.cpp):
+    1. If a BUTTONDOWN arrives for finger 0 while a click is already
+       pending (_fingerDown[0] true and _doClick true), it is phantom
+       and is discarded without moving the cursor.
+    2. Motion events in direct-touch mode during a pending click are
+       discarded (return false) so they cannot relocate the cursor.
+    3. The cumulative-drift click-cancellation deadzone is only applied
+       in trackpad mode; in direct-touch mode the drag timer handles
+       intentional drags.
+
+  This was not an issue with original 2.1.0 hardware (less wear), but
+  is required for devices used since 2019.
+
+  Screen layout
+  -------------
+  The Palm Pre screen is 320x480 (portrait). ScummVM defaults to 2x
+  scaling, producing a 640x400 virtual overlay displayed letterboxed
+  in a 320x200 physical area centered on the screen. The top and
+  bottom ~140 pixels of the physical screen are unused dead zones.
+
+  glibc compatibility
+  -------------------
+  See "BUILDING FROM SOURCE" above. Never use system GCC (5+) to build
+  for this target; always use the Linaro 4.9.4 cross-compiler.

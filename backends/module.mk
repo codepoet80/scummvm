@@ -365,6 +365,11 @@ MODULE_OBJS += \
 	graphics/openpandora/op-graphics.o
 endif
 
+ifeq ($(BACKEND),webos)
+MODULE_OBJS += \
+	events/webossdl/webossdl-events.o
+endif
+
 ifeq ($(BACKEND),psp)
 MODULE_OBJS += \
 	fs/psp/psp-fs.o \
