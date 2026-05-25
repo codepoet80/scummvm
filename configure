@@ -3864,7 +3864,6 @@ case $_backend in
 		;;
 	webos)
 		append_var DEFINES "-DWEBOS"
-		append_var DEFINES "-DARM_TARGET"
 		append_var MODULES "backends/platform/sdl"
 		_sdl=no
 		;;
