@@ -94,8 +94,9 @@ if [ ! -f "$CONFIG_MK" ] || [ "$CONFIGURE" -nt "$CONFIG_MK" ]; then
             --enable-release
     )
 
-    # Fix AR: configure appends the ar command twice (cr cru), keep only cr.
+    # Fix AR: configure appends the ar flags twice (cr cru or cr cr), keep only cr.
     sed -i 's|arm-linux-gnueabi-ar cr cru|arm-linux-gnueabi-ar cr|g' "$CONFIG_MK"
+    sed -i 's|arm-linux-gnueabi-ar cr cr|arm-linux-gnueabi-ar cr|g' "$CONFIG_MK"
 
     # Remove stray host-system includes that configure picks up from the
     # build machine's freetype/libpng. Those headers reference symbols from

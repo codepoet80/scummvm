@@ -3182,6 +3182,8 @@ EOF
 		_vkeybd=yes
 		_sdl=no
 		_sdlnet=no
+		# MT32EMU uses C99 long-double math (acoshl, etc.) absent in glibc 2.5
+		_mt32emu=no
 		if test "$_dynamic_modules" = yes; then
 			_plugins_default=dynamic
 		fi
