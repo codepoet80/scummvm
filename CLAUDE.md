@@ -2,7 +2,13 @@
 
 This is a personal fork of ScummVM that restores the WebOS backend
 removed upstream in August 2020 (commit eaa86f93334). The active work
-branch is **webos-2.2**, based on current master.
+branch is **webos-2.5**, based on ScummVM v2.5.0.
+
+Branch history:
+- **webos-2.2**: based on ScummVM master (2026.x), version 2.2.2026 — first
+  working port. All 67–87 plugins load, touch input works on HP TouchPad.
+- **webos-2.5**: based on ScummVM v2.5.0 tag — current branch. Same backend
+  code as webos-2.2, tested working (67 plugins, launcher runs on device).
 
 ---
 
@@ -11,21 +17,25 @@ branch is **webos-2.2**, based on current master.
 | Thing | Location |
 |---|---|
 | Source tree | `/home/jonwise/Projects/scummvm` |
-| Build directory | `/home/jonwise/Projects/scummvm-webos-build` |
+| Build directory | `/home/jonwise/Projects/scummvm-webos25-build` |
 | WebOS PDK | `/opt/PalmPDK` |
 | WebOS SDK | `/opt/PalmSDK/0.2` |
 | Linaro GCC 4.9.4 | `~/Projects/qupzilla/toolchains/gcc-linaro/bin/` |
-| IPK output | `scummvm-webos-build/portdist/org.scummvm.scummvm_*.ipk` |
+| IPK output | `scummvm-webos25-build/portdist/org.scummvm.scummvm_*.ipk` |
 
 **Always use the Linaro GCC 4.9.4 cross-compiler, never system GCC.**
-The device has glibc 2.5 (max symbol GLIBC_2.4). GCC 5+ emits
-GLIBC_2.17+ symbols (clock_gettime wrappers, strtol variants) that
-crash at launch with "symbol not found." Linaro 4.9.4 stays clean.
+The device has glibc ≤ 2.8 (conservative safe target: GLIBC_2.4).
+GCC 5+ emits GLIBC_2.17+ / GLIBC_2.38+ symbols (__isoc23_strtol,
+clock_gettime wrappers) that crash at launch. Linaro 4.9.4 stays clean.
+
+**Pass Linaro toolchain via env to configure** so config.mk is generated
+with the full paths directly (prevents Makefile reconfigure from reverting
+to the system compiler):
 
 Quick rebuild after a source change:
 
 ```sh
-cd ~/Projects/scummvm-webos-build
+cd ~/Projects/scummvm-webos25-build
 make -j$(nproc)
 make package
 ```
@@ -35,21 +45,30 @@ The configure invocation that produced the current config.mk:
 ```sh
 export WEBOS_PDK=/opt/PalmPDK
 export WEBOS_SDK=/opt/PalmSDK/0.2
-cd ~/Projects/scummvm-webos-build
-~/Projects/scummvm/configure \
+LINARO=~/Projects/qupzilla/toolchains/gcc-linaro/bin/arm-linux-gnueabi
+cd ~/Projects/scummvm-webos25-build
+CXX="$LINARO-g++" AR="$LINARO-ar cr" RANLIB="$LINARO-ranlib" \
+  STRIP="$LINARO-strip" AS="$LINARO-as" \
+  ~/Projects/scummvm/configure \
   --host=webos --enable-plugins --default-dynamic --enable-release
-# Then patch config.mk tool paths to full Linaro paths (see below)
+# Then remove stray host includes from CXXFLAGS in config.mk:
+sed -i 's| -I/usr/include/freetype2 -I/usr/include/libpng16||g' config.mk
+# Fix doubled AR (configure appends "cru" again):
+sed -i 's|arm-linux-gnueabi-ar cr cru|arm-linux-gnueabi-ar cr|g' config.mk
 ```
 
-After configure, `config.mk` tool names must be replaced with full
-Linaro paths because the short names (arm-linux-gnueabi-g++) may
-resolve to system GCC on the build host:
+Passing toolchain via env bakes the full Linaro paths into config.mk
+directly. The Makefile re-runs configure when the configure script changes;
+without env-var baking, the new config.mk would use the system GCC.
+
+The stray `-I/usr/include/freetype2 -I/usr/include/libpng16` appear when
+configure finds host freetype/libpng via `freetype-config` or `pkg-config`.
+Those headers reference glibc 2.38+ symbols; they must be stripped.
 
 ```
 CXX  := .../gcc-linaro/bin/arm-linux-gnueabi-g++
 AR   := .../gcc-linaro/bin/arm-linux-gnueabi-ar cr
 LD   := .../gcc-linaro/bin/arm-linux-gnueabi-g++
-NM   := .../gcc-linaro/bin/arm-linux-gnueabi-nm
 RANLIB := .../gcc-linaro/bin/arm-linux-gnueabi-ranlib
 STRIP  := .../gcc-linaro/bin/arm-linux-gnueabi-strip
 ```
@@ -251,8 +270,8 @@ applies to Palm Pre hardware; bugs 1–4 are TouchPad-specific.
 
 ## What works / what doesn't
 
-**Works:**
-- All ScummVM engines (current master, ~2026.x — more than 2.5.0)
+**Works (tested on HP TouchPad with webos-2.5 / ScummVM 2.5.0):**
+- 67 engine plugins load and work (all from the v2.5.0 engine set)
 - Dynamic plugin loading from /lib/*.so
 - Direct-touch (default) and trackpad input modes
 - All two-finger and three-finger gestures
