@@ -3818,9 +3818,12 @@ case $_backend in
 		;;
 	webos)
 		append_var DEFINES "-DWEBOS"
-		append_var DEFINES "-DNONSTANDARD_PORT"
-		append_var DEFINES "-DDISABLE_COMMAND_LINE"
+		# There is no sdl-config in the WebOS PDK so we don't use find_sdlconfig here.
+		# The PDL library acts as the WebOS device toolchain for OS-level events.
+		# SDL is provided via the PDK; we use no = skip auto-detect but libs were
+		# already added manually in the host-specific section above.
 		_sdl=no
+		append_var MODULES "backends/platform/sdl"
 		;;
 	wii)
 		append_var DEFINES "-D__WII__"
