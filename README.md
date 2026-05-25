@@ -65,6 +65,10 @@ For everything you need to know about how to use ScummVM, see our [user document
 
 Our extensive change log is available [here](NEWS.md).
 
+### WebOS Port
+
+This fork restores the WebOS backend (removed upstream August 2020) for HP TouchPad and Palm Pre hardware. For build instructions, forward-porting notes, and known hardware quirks, see [webos-build.md](webos-build.md).
+
 ## Credits
 
 A massive thank you to the entire team for making the ScummVM project possible. See the credits [here](AUTHORS)!
