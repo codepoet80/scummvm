@@ -20,34 +20,17 @@
  *
  */
 
-#include "common/scummsys.h"
+#ifndef PLATFORM_SDL_WEBOS_H
+#define PLATFORM_SDL_WEBOS_H
 
-#if defined(POSIX) && !defined(MACOSX) && !defined(SAMSUNGTV) && !defined(MAEMO) && !defined(WEBOS) && !defined(GPH_DEVICE) && !defined(GP2X) && !defined(DINGUX) && !defined(OPENPANDORA) && !defined(PLAYSTATION3) && !defined(PSP2) && !defined(ANDROIDSDL) && !defined(NINTENDO_SWITCH)
-
+#include "common/system.h"
 #include "backends/platform/sdl/posix/posix.h"
-#include "backends/plugins/sdl/sdl-provider.h"
-#include "base/main.h"
 
-int main(int argc, char *argv[]) {
+class OSystem_SDL_WebOS : public OSystem_POSIX {
+public:
+	OSystem_SDL_WebOS();
 
-	// Create our OSystem instance
-	g_system = new OSystem_POSIX();
-	assert(g_system);
-
-	// Pre initialize the backend
-	g_system->init();
-
-#ifdef DYNAMIC_MODULES
-	PluginManager::instance().addPluginProvider(new SDLPluginProvider());
-#endif
-
-	// Invoke the actual ScummVM main entry point:
-	int res = scummvm_main(argc, argv);
-
-	// Free OSystem
-	g_system->destroy();
-
-	return res;
-}
+	virtual void initBackend();
+};
 
 #endif

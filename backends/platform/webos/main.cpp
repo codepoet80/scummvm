@@ -20,21 +20,20 @@
  *
  */
 
-#include "common/scummsys.h"
+#define FORBIDDEN_SYMBOL_EXCEPTION_unistd_h
 
-#if defined(POSIX) && !defined(MACOSX) && !defined(SAMSUNGTV) && !defined(MAEMO) && !defined(WEBOS) && !defined(GPH_DEVICE) && !defined(GP2X) && !defined(DINGUX) && !defined(OPENPANDORA) && !defined(PLAYSTATION3) && !defined(PSP2) && !defined(ANDROIDSDL) && !defined(NINTENDO_SWITCH)
-
-#include "backends/platform/sdl/posix/posix.h"
+#include "backends/platform/webos/webos.h"
 #include "backends/plugins/sdl/sdl-provider.h"
 #include "base/main.h"
 
-int main(int argc, char *argv[]) {
+#if defined(WEBOS)
 
-	// Create our OSystem instance
-	g_system = new OSystem_POSIX();
+#include <unistd.h>
+
+int main(int argc, char* argv[]) {
+	g_system = new OSystem_SDL_WebOS();
 	assert(g_system);
 
-	// Pre initialize the backend
 	g_system->init();
 
 #ifdef DYNAMIC_MODULES

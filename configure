@@ -785,7 +785,7 @@ Configuration:
   -h, --help              display this help and exit
   --backend=BACKEND       backend to build (3ds, android, dc, dingux, ds, gcw0,
                           gph, iphone, ios7, ios7-arm64, maemo, n64, null, openpandora,
-                          psp, psp2, samsungtv, sdl, switch, wii) [sdl]
+                          psp, psp2, samsungtv, sdl, switch, webos, wii) [sdl]
 
 Installation directories:
   --prefix=PREFIX         install architecture-independent files in PREFIX
@@ -838,6 +838,7 @@ Special configuration feature:
                                            psp for PlayStation Portable
                                            samsungtv for Samsung TV
                                            switch for Nintendo Switch
+                                           webos for HP Palm WebOS
                                            wii for Nintendo Wii
 
 Game engines:
@@ -1736,6 +1737,21 @@ wasm32-*)
 	datadir='/scummvm'
 	CXX="em++"
 	;;
+webos)
+	_host_os=webos
+	_host_cpu=arm
+	_host_alias=arm-linux-gnueabi
+	# The prefix is always the same on WebOS so we hardcode the default
+	# here. It is still possible to define a custom prefix which is
+	# needed when packaging the app with a user-specific app ID.
+	test "x$prefix" = xNONE && prefix=/media/cryptofs/apps/usr/palm/applications/org.scummvm.scummvm
+	# WebOS apps are installed into app-specific directories. The
+	# default directory structure of ScummVM makes no sense here so we
+	# hardcode WebOS specific directories here.
+	datarootdir='${prefix}/data'
+	datadir='${datarootdir}'
+	docdir='${prefix}/doc'
+	;;
 wii)
 	_host_os=wii
 	_host_cpu=powerpc
@@ -1871,6 +1887,16 @@ psp)
 	append_var LDFLAGS "-L$PSPSDK/lib"
 	append_var LDFLAGS "-specs=$_srcdir/backends/platform/psp/psp.spec"
 
+	;;
+webos)
+	if test -z "$WEBOS_SDK"; then
+		echo "Please set WEBOS_SDK in your environment. export WEBOS_SDK=<path to WebOS SDK>"
+		exit 1
+	fi
+	if test -z "$WEBOS_PDK"; then
+		echo "Please set WEBOS_PDK in your environment. export WEBOS_PDK=<path to WebOS PDK>"
+		exit 1
+	fi
 	;;
 riscos)
 	if test -z "$GCCSDK_INSTALL_ENV"; then
@@ -2185,7 +2211,7 @@ if test "$have_gcc" = yes ; then
 		case $_host_os in
 		# newlib-based system include files suppress non-C89 function
 		# declarations under __STRICT_ANSI__, undefine it
-		3ds | amigaos* | android | androidsdl | dreamcast | ds | gamecube | mingw* | mint* | n64 | psp | ps3 | psp2 | switch | wii )
+		3ds | amigaos* | android | androidsdl | dreamcast | ds | gamecube | mingw* | mint* | n64 | psp | ps3 | psp2 | switch | webos | wii )
 			append_var CXXFLAGS "-U__STRICT_ANSI__"
 			;;
 		*)
@@ -2316,7 +2342,7 @@ fi
 # However, some platforms use GNU extensions in system header files, so
 # for these we must not use -pedantic.
 case $_host_os in
-3ds | android | androidsdl | gamecube | psp | switch | wii)
+3ds | android | androidsdl | gamecube | psp | switch | webos | wii)
 	;;
 *)
 	# ICC does not support pedantic, while GCC and clang do.
@@ -3594,6 +3620,38 @@ if test -n "$_host"; then
 			_vkeybd=yes
 			_port_mk="backends/platform/sdl/switch/switch.mk"
 			;;
+		webos)
+			append_var CXXFLAGS "--sysroot=$WEBOS_PDK/arm-gcc/sysroot"
+			append_var CXXFLAGS "-I$WEBOS_PDK/include"
+			append_var CXXFLAGS "-I$WEBOS_PDK/include/SDL"
+			append_var CXXFLAGS "-I$WEBOS_PDK/arm-gcc/sysroot/usr/include"
+			append_var CXXFLAGS "-I$WEBOS_SDK/include"
+			append_var CXXFLAGS "-I$WEBOS_PDK/include/freetype2"
+			append_var CXXFLAGS "-I$WEBOS_PDK/device/usr/include"
+			append_var CXXFLAGS "-march=armv7-a"
+			append_var CXXFLAGS "-mfloat-abi=softfp"
+			append_var CXXFLAGS "-mfpu=neon"
+			append_var CXXFLAGS "-ffast-math"
+			append_var LDFLAGS "-Wl,-rpath-link,$WEBOS_PDK/device/lib"
+			append_var LDFLAGS "-L$WEBOS_PDK/device/lib"
+			append_var LDFLAGS "-L$WEBOS_PDK/device/usr/lib"
+			append_var LIBS "-lSDL -lpthread -lPDL"
+			append_var LDFLAGS "--sysroot=$WEBOS_PDK/arm-gcc/sysroot"
+			add_line_to_config_mk "WEBOS_SDK = $WEBOS_SDK"
+			_backend="webos"
+			_port_mk="backends/platform/webos/webos.mk"
+			_build_hq_scalers=no
+			_mt32emu=no
+			_vkeybd=yes
+			_seq_midi=no
+			_timidity=no
+			_flac=no
+			_mad=no
+			_tremor=no
+			_zlib=yes
+			_dynamic_modules=yes
+			_plugins_default=dynamic
+			;;
 		wii)
 			_backend="wii"
 			_build_scalers=no
@@ -3755,6 +3813,12 @@ case $_backend in
 		_sdl=auto
 		append_var MODULES "backends/platform/sdl"
 		;;
+	webos)
+		append_var DEFINES "-DWEBOS"
+		append_var DEFINES "-DNONSTANDARD_PORT"
+		append_var DEFINES "-DDISABLE_COMMAND_LINE"
+		_sdl=no
+		;;
 	wii)
 		append_var DEFINES "-D__WII__"
 		append_var DEFINES "-DGEKKO"
@@ -3903,7 +3967,7 @@ fi
 # Enable 16bit support only for backends which support it
 #
 case $_backend in
-	3ds | android | android3d | androidsdl | dingux | dc | ds | gph | iphone | ios7 | maemo | null | openpandora | psp | psp2 | samsungtv | sdl | switch | wii)
+	3ds | android | android3d | androidsdl | dingux | dc | ds | gph | iphone | ios7 | maemo | null | openpandora | psp | psp2 | samsungtv | sdl | switch | webos | wii)
 		if test "$_16bit" = auto ; then
 			_16bit=yes
 		else
@@ -3979,7 +4043,7 @@ case $_host_os in
 	amigaos* | cygwin* | dreamcast | ds | gamecube | mingw* | morphos | n64 | ps3 | psp2 | psp | riscos | wii)
 		_posix=no
 		;;
-	3ds | android | androidsdl | beos* | bsd* | darwin* | freebsd* | gnu* | gph-linux | haiku* | hpux* | iphone | ios7 | irix*| k*bsd*-gnu* | linux* | maemo | mint* | netbsd* | openbsd* | solaris* | sunos* | switch | uclinux*)
+	3ds | android | androidsdl | beos* | bsd* | darwin* | freebsd* | gnu* | gph-linux | haiku* | hpux* | iphone | ios7 | irix*| k*bsd*-gnu* | linux* | maemo | mint* | netbsd* | openbsd* | solaris* | sunos* | switch | uclinux* | webos)
 		_posix=yes
 		;;
 	os2-emx*)
@@ -5946,8 +6010,8 @@ case $_backend in
 		# Add ../plugins as a path so plugins can be found when running from a .PND.
 		append_var DEFINES "-DPLUGIN_DIRECTORY=\\\"../plugins\\\""
 		;;
-	maemo)
-		# The Maemo apps want the plugins in the "lib" directory
+	maemo | webos)
+		# The Maemo and WebOS apps want the plugins in the "lib" directory
 		# without a scummvm sub directory.
 		append_var DEFINES "-DPLUGIN_DIRECTORY=\\\"$libdir\\\""
 		;;
