@@ -80,6 +80,13 @@ if [ ! -f "$CONFIG_MK" ] || [ "$CONFIGURE" -nt "$CONFIG_MK" ]; then
         cd "$BUILD_DIR"
         export WEBOS_PDK
         export WEBOS_SDK
+        # Pass Linaro toolchain via env so configure bakes the full paths
+        # into config.mk directly, avoiding any accidental system GCC pickup.
+        CXX="$LINARO_BIN/arm-linux-gnueabi-g++" \
+        AR="$LINARO_BIN/arm-linux-gnueabi-ar cr" \
+        RANLIB="$LINARO_BIN/arm-linux-gnueabi-ranlib" \
+        STRIP="$LINARO_BIN/arm-linux-gnueabi-strip" \
+        AS="$LINARO_BIN/arm-linux-gnueabi-as" \
         "$CONFIGURE" \
             --host=webos \
             --enable-plugins \
@@ -87,18 +94,14 @@ if [ ! -f "$CONFIG_MK" ] || [ "$CONFIGURE" -nt "$CONFIG_MK" ]; then
             --enable-release
     )
 
-    # Patch config.mk to use full Linaro paths instead of bare tool names.
-    # The bare names may resolve to system GCC (5+) which generates glibc
-    # symbols the device cannot satisfy.
-    echo "==> Patching config.mk with full Linaro tool paths"
-    LINARO="$LINARO_BIN"
-    sed -i "s|^CXX :=.*|CXX := $LINARO/arm-linux-gnueabi-g++|" "$CONFIG_MK"
-    sed -i "s|^AR :=.*|AR := $LINARO/arm-linux-gnueabi-ar cr|" "$CONFIG_MK"
-    sed -i "s|^AS :=.*|AS := $LINARO/arm-linux-gnueabi-as|" "$CONFIG_MK"
-    sed -i "s|^LD :=.*|LD := $LINARO/arm-linux-gnueabi-g++|" "$CONFIG_MK"
-    sed -i "s|^NM :=.*|NM := $LINARO/arm-linux-gnueabi-nm|" "$CONFIG_MK"
-    sed -i "s|^RANLIB :=.*|RANLIB := $LINARO/arm-linux-gnueabi-ranlib|" "$CONFIG_MK"
-    sed -i "s|^STRIP :=.*|STRIP := $LINARO/arm-linux-gnueabi-strip|" "$CONFIG_MK"
+    # Fix AR: configure appends the ar command twice (cr cru), keep only cr.
+    sed -i 's|arm-linux-gnueabi-ar cr cru|arm-linux-gnueabi-ar cr|g' "$CONFIG_MK"
+
+    # Remove stray host-system includes that configure picks up from the
+    # build machine's freetype/libpng. Those headers reference symbols from
+    # the host's glibc that do not exist on the device (glibc 2.5).
+    sed -i 's| -I/usr/include/freetype2 -I/usr/include/libpng[^ ]*||g' "$CONFIG_MK"
+    sed -i 's| -I/usr/include/freetype2||g; s| -I/usr/include/libpng[^ ]*||g' "$CONFIG_MK"
 else
     echo ""
     echo "==> config.mk is up to date, skipping configure"
