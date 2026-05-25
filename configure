@@ -3638,7 +3638,7 @@ if test -n "$_host"; then
 			append_var LDFLAGS "-Wl,-rpath-link,$WEBOS_PDK/device/lib"
 			append_var LDFLAGS "-L$WEBOS_PDK/device/lib"
 			append_var LDFLAGS "-L$WEBOS_PDK/device/usr/lib"
-			append_var LIBS "-lSDL -lpthread -lPDL"
+			append_var LIBS "-lSDL -lpthread -lpdl"
 			append_var LDFLAGS "--sysroot=$WEBOS_PDK/arm-gcc/sysroot"
 			# WebOS uses SDL1 from the PDK; skip auto-detect but define SDL_BACKEND
 			# manually so the SDL plugin provider (sdl-provider.h) is compiled in.
